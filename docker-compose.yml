@@ -1,6 +1,8 @@
-# Roadie — ambiente de desenvolvimento
-# Sobe banco, API e (em breve) o console web com um único comando:
+# Roadie — ambiente local
+# Sobe banco, API e console web com um único comando:
 #   docker compose up --build
+#
+# Portas no host vêm do .env (POSTGRES_PORT, API_PORT, WEB_PORT).
 
 name: roadie
 
@@ -32,6 +34,7 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-roadie}:${POSTGRES_PASSWORD:-roadie}@db:5432/${POSTGRES_DB:-roadie}
       DATA_DIR: /app/data
+      CORS_ORIGINS: http://localhost:${WEB_PORT:-3000}
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:
@@ -41,6 +44,17 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        API_INTERNAL_URL: http://api:8000
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      - api
 
 volumes:
   roadie_pgdata:

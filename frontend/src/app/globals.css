@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+/* Paleta "luthier": ébano, jacarandá, latão e marfim. */
+@theme {
+  --color-ebony: #0b0a09;
+  --color-ink: #121010;
+  --color-surface: #181513;
+  --color-raised: #1f1b18;
+  --color-hover: #26211d;
+  --color-line: #2c2622;
+  --color-line-strong: #3b332d;
+  --color-ivory: #efe7da;
+  --color-parchment: #d9cfbf;
+  --color-muted: #9a9088;
+  --color-dim: #6f6660;
+  --color-brass: #c9a24d;
+  --color-brass-bright: #e3bd63;
+  --color-brass-dim: #8a6f30;
+  --color-rosewood: #7a3b2e;
+  --color-rosewood-soft: #a45a48;
+  --color-sage: #86a874;
+  --color-ember: #c7675a;
+  --color-amber: #d6a35c;
+  --color-sky: #7f9fb8;
+
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace;
+
+  --shadow-glow: 0 0 0 1px rgb(201 162 77 / 0.25), 0 12px 40px -12px rgb(201 162 77 / 0.25);
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  height: 100%;
+  background: var(--color-ebony);
+  color: var(--color-ivory);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  background-image:
+    radial-gradient(1200px 600px at 10% -10%, rgb(122 59 46 / 0.18), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgb(201 162 77 / 0.10), transparent 55%);
+  background-attachment: fixed;
+}
+
+::selection {
+  background: rgb(201 162 77 / 0.35);
+}
+
+/* Barras de rolagem discretas */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border-radius: 8px;
+}
+
+/* Utilitários do console */
+.hairline {
+  border-color: var(--color-line);
+}
+.panel {
+  background: color-mix(in oklab, var(--color-surface) 92%, black);
+  border: 1px solid var(--color-line);
+  border-radius: 1rem;
+}
+.brass-text {
+  background: linear-gradient(120deg, var(--color-brass-bright), var(--color-brass), var(--color-brass-dim));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.bubble-tom {
+  background: linear-gradient(180deg, var(--color-raised), var(--color-surface));
+  border: 1px solid var(--color-line);
+}
+.bubble-cliente {
+  background: linear-gradient(180deg, rgb(122 59 46 / 0.55), rgb(122 59 46 / 0.35));
+  border: 1px solid rgb(164 90 72 / 0.45);
+}
+.caret::after {
+  content: "▍";
+  color: var(--color-brass);
+  animation: blink 1s steps(2, start) infinite;
+}
+@keyframes blink {
+  to {
+    visibility: hidden;
+  }
+}
+.fade-in {
+  animation: fade 0.25s ease-out both;
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

@@ -1,0 +1,71 @@
+# Roadie — produção (VPS)
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Um único domínio: o Caddy serve o console em "/" e encaminha "/api/*" para a
+# API, com HTTPS automático (Let's Encrypt). Nada além das portas 80/443 fica
+# exposto no host; banco e API só existem na rede interna do compose.
+
+name: roadie
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-roadie}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+      POSTGRES_DB: ${POSTGRES_DB:-roadie}
+    volumes:
+      - roadie_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-roadie} -d ${POSTGRES_DB:-roadie}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      APP_ENV: prod
+      COOKIE_SECURE: "true"
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-roadie}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-roadie}
+      DATA_DIR: /app/data
+      CORS_ORIGINS: https://${ROADIE_DOMAIN:?defina ROADIE_DOMAIN no .env}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        API_INTERNAL_URL: http://api:8000
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      ROADIE_DOMAIN: ${ROADIE_DOMAIN}
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      - roadie_caddy_data:/data
+      - roadie_caddy_config:/config
+    depends_on:
+      - web
+      - api
+
+volumes:
+  roadie_pgdata:
+  roadie_caddy_data:
+  roadie_caddy_config:
