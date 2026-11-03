@@ -49,13 +49,13 @@ def _enum(cls: type[enum.Enum], name: str) -> Enum:
 # ----------------------------------------------------------------------------
 # Enumerações
 # ----------------------------------------------------------------------------
-class ProductStatus(str, enum.Enum):
+class ProductStatus(enum.StrEnum):
     active = "active"
     discontinued = "discontinued"
     coming_soon = "coming_soon"
 
 
-class OrderStatus(str, enum.Enum):
+class OrderStatus(enum.StrEnum):
     pending = "pending"
     confirmed = "confirmed"
     shipped = "shipped"
@@ -63,17 +63,17 @@ class OrderStatus(str, enum.Enum):
     cancelled = "cancelled"
 
 
-class UserRole(str, enum.Enum):
+class UserRole(enum.StrEnum):
     admin = "admin"
     agent = "agent"
 
 
-class MessageRole(str, enum.Enum):
+class MessageRole(enum.StrEnum):
     user = "user"
     assistant = "assistant"
 
 
-class TicketCategory(str, enum.Enum):
+class TicketCategory(enum.StrEnum):
     reclamacao = "reclamacao"
     cancelamento = "cancelamento"
     devolucao = "devolucao"
@@ -84,13 +84,13 @@ class TicketCategory(str, enum.Enum):
     outro = "outro"
 
 
-class TicketStatus(str, enum.Enum):
+class TicketStatus(enum.StrEnum):
     aberto = "aberto"
     em_andamento = "em_andamento"
     resolvido = "resolvido"
 
 
-class FlagSeverity(str, enum.Enum):
+class FlagSeverity(enum.StrEnum):
     info = "info"
     warning = "warning"
     quarantine = "quarantine"
@@ -119,7 +119,9 @@ class Product(Base):
     price_brl: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     stock_quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    status: Mapped[ProductStatus] = mapped_column(_enum(ProductStatus, "product_status"), nullable=False)
+    status: Mapped[ProductStatus] = mapped_column(
+        _enum(ProductStatus, "product_status"), nullable=False
+    )
     specs: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     created_at: Mapped[date | None] = mapped_column(Date)
     # Sinalizações de qualidade detectadas na ingestão (ex.: brand_mismatch).

@@ -49,7 +49,11 @@ def create_app() -> FastAPI:
             "status": "ok",
             "version": __version__,
             "env": settings.app_env,
-            "clock": {"now": now.isoformat(), "simulated": clock.is_simulated, "label": clock.describe(now)},
+            "clock": {
+                "now": now.isoformat(),
+                "simulated": clock.is_simulated,
+                "label": clock.describe(now),
+            },
         }
 
     return app
