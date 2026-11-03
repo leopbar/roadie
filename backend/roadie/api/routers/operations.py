@@ -199,6 +199,7 @@ async def meta(
 ) -> dict:
     s = get_settings()
     service = get_service(request)
+    models = await service.ensure_models()
     now = service.clock.now()
     counts = {
         "products": await session.scalar(select(func.count(Product.product_id))) or 0,
@@ -220,9 +221,11 @@ async def meta(
             "timezone": s.store_timezone,
         },
         "model": {
-            "mode": service.models.mode,
-            "primary": service.models.primary_name,
-            "fallback": service.models.fallback_name,
+            "mode": models.mode,
+            "primary": models.primary_name,
+            "fallback": models.fallback_name,
+            "configured": models.mode != "unconfigured",
+            "key_source": models.key_source,
         },
         "counts": counts,
     }

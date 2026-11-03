@@ -20,7 +20,7 @@ from sqlalchemy.orm import selectinload
 
 from roadie.agent.context import Identity, RunContext
 from roadie.agent.graph import build_graph
-from roadie.agent.llm import ModelBundle, build_models
+from roadie.agent.llm import LLMNotConfigured, ModelBundle, build_models_from_config
 from roadie.agent.receipt import build_receipt, final_answer
 from roadie.agent.tools import ALL_TOOLS
 from roadie.clock import StoreClock, get_clock
@@ -28,6 +28,7 @@ from roadie.config import Settings, get_settings
 from roadie.db.engine import get_session_factory
 from roadie.db.models import Conversation, Customer, Message, MessageRole, PolicyClause
 from roadie.ingest.csv_loader import only_digits
+from roadie.llm_config import resolve_llm_config
 
 EventCallback = Callable[[dict], Awaitable[None]]
 HISTORY_LIMIT = 40
@@ -51,10 +52,31 @@ class TomService:
     ) -> None:
         self.settings = settings or get_settings()
         self.session_factory = session_factory or get_session_factory()
-        self.models = models or build_models(self.settings, ALL_TOOLS)
         self.clock = clock or get_clock()
-        self.graph = build_graph(self.models, ALL_TOOLS, self.settings.max_tool_rounds)
+        self.models: ModelBundle | None = models
+        self.graph = (
+            build_graph(models, ALL_TOOLS, self.settings.max_tool_rounds) if models else None
+        )
         self._toc: list[tuple[str, str]] | None = None
+
+    # ------------------------------------------------------------------ modelo
+    async def ensure_models(self) -> ModelBundle:
+        """Monta o modelo na primeira necessidade, lendo banco e ambiente."""
+        if self.models is None:
+            cfg = await resolve_llm_config(self.session_factory, self.settings)
+            self.models = build_models_from_config(cfg, ALL_TOOLS)
+            self.graph = (
+                build_graph(self.models, ALL_TOOLS, self.settings.max_tool_rounds)
+                if self.models.mode != "unconfigured"
+                else None
+            )
+        return self.models
+
+    async def reload_llm(self) -> ModelBundle:
+        """Chamado quando a chave ou os modelos mudam pelo console."""
+        self.models = None
+        self.graph = None
+        return await self.ensure_models()
 
     # ------------------------------------------------------------------ apoio
     async def policy_toc(self) -> list[tuple[str, str]]:
@@ -182,6 +204,12 @@ class TomService:
         if not text:
             raise ValueError("mensagem vazia")
         started = perf_counter()
+        models = await self.ensure_models()
+        if models.mode == "unconfigured" or self.graph is None:
+            raise LLMNotConfigured(
+                "Nenhuma chave da OpenAI configurada. Cadastre em Configurações no console "
+                "ou defina OPENAI_API_KEY no .env."
+            )
         toc = await self.policy_toc()
 
         async with self.session_factory() as session:

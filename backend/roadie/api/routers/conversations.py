@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sse_starlette.sse import EventSourceResponse
 
+from roadie.agent.llm import LLMNotConfigured
 from roadie.api.deps import current_user, get_db, get_service, limiter
 from roadie.api.schemas import (
     ConversationCreate,
@@ -205,6 +206,8 @@ async def send_message(
 ) -> dict:
     try:
         reply = await service.send(conversation_id, body.text)
+    except LLMNotConfigured as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
     except LookupError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
     return {

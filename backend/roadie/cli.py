@@ -307,10 +307,11 @@ async def _chat(phone: str | None, now: str | None, show_receipt: bool) -> None:
     from roadie.agent.service import TomService
 
     service = TomService()
+    models = await service.ensure_models()
     conv = await service.start_conversation(phone, clock_override=_parse_now(now))
     label = "identificado" if conv.identity_verified else "não identificado"
     console.print(
-        f"[bold]Roadie[/bold] — conversa {conv.id} | remetente {phone or 'desconhecido'} ({label}) | modelo {service.models.mode}"
+        f"[bold]Roadie[/bold] — conversa {conv.id} | remetente {phone or 'desconhecido'} ({label}) | modelo {models.mode}"
     )
     console.print("[dim]Digite a mensagem do cliente. Ctrl+C ou 'sair' para encerrar.[/dim]")
     while True:

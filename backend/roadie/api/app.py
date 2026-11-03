@@ -13,7 +13,7 @@ from sqlalchemy import text
 
 from roadie import __version__
 from roadie.api.deps import limiter
-from roadie.api.routers import auth, conversations, operations, users
+from roadie.api.routers import auth, conversations, llm, operations, users
 from roadie.clock import get_clock
 from roadie.config import get_settings
 from roadie.db.engine import dispose_engine, get_engine
@@ -70,6 +70,7 @@ def create_app() -> FastAPI:
     app.include_router(conversations.router)
     app.include_router(operations.router)
     app.include_router(users.router)
+    app.include_router(llm.router)
 
     @app.get("/health", tags=["infra"])
     async def health() -> dict:
