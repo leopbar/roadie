@@ -19,6 +19,23 @@ Projeto desenvolvido para o desafio técnico de AI Engineer da [Artefact](https:
 
 ---
 
+## 🎬 Em ação
+
+<p align="center">
+  <img src="docs/screenshots/simulador.png" alt="Simulador de atendimento com o painel de bastidores" width="900" />
+</p>
+
+> A Camila, identificada pelo telefone, pergunta se pode devolver a compra. O Tom consulta os pedidos dela, aplica a política de trocas e descobre que o pedido 16 ainda nem foi enviado: o caminho é cancelamento, não devolução. À direita, o recibo de evidências: identidade verificada, três consultas, cláusulas citadas, regra aplicada, tokens e custo.
+
+<p align="center">
+  <img src="docs/screenshots/qualidade.png" alt="Tela de qualidade de dados com as sinalizações da ingestão" width="440" />
+  <img src="docs/screenshots/politicas.png" alt="Tela de políticas com as cláusulas extraídas do manual" width="440" />
+</p>
+
+> À esquerda, o que a ingestão encontrou de errado nos CSVs, em três severidades. À direita, o manual extraído do PDF em cláusulas numeradas, com a mesma busca que o Tom usa.
+
+---
+
 ## 🎯 O desafio
 
 A Empório da Música é uma loja fictícia de instrumentos em Campo Grande/MS. A equipe está afogada em perguntas repetidas no WhatsApp: horário, status de pedido, preço, estoque, troca. A missão era prototipar um agente de mensagens que assumisse a persona da loja, respondesse com base nos dados e no manual de políticas, soubesse quando consultar cada um, e lidasse bem com o que foge do escopo.
