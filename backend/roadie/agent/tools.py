@@ -12,20 +12,20 @@ identificado na conversa. Isso é imposto aqui, não no prompt.
 from __future__ import annotations
 
 import json
-import re
 from datetime import date, datetime
 from decimal import Decimal
 from time import perf_counter
 
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select
 
 from roadie.agent import catalog
 from roadie.agent.context import RunContext, ctx_from_config
 from roadie.db.models import Customer, PolicyClause, Ticket, TicketCategory
 from roadie.ingest.csv_loader import only_digits
 from roadie.policy import rules
+from roadie.policy.search import search_clauses
 from roadie.textfmt import brl
 
 MAX_IDENTITY_ATTEMPTS = 3
@@ -40,53 +40,6 @@ TICKET_CATEGORY_ALIASES = {
     "cadastro": TicketCategory.cadastro,
     "garantia": TicketCategory.garantia,
     "outro": TicketCategory.outro,
-}
-STOPWORDS = {
-    "a",
-    "o",
-    "e",
-    "de",
-    "da",
-    "do",
-    "das",
-    "dos",
-    "em",
-    "um",
-    "uma",
-    "que",
-    "com",
-    "sem",
-    "para",
-    "por",
-    "se",
-    "meu",
-    "minha",
-    "meus",
-    "minhas",
-    "posso",
-    "pode",
-    "como",
-    "qual",
-    "quais",
-    "tem",
-    "tenho",
-    "eu",
-    "voce",
-    "vocês",
-    "voces",
-    "sobre",
-    "ate",
-    "até",
-    "ja",
-    "já",
-    "nao",
-    "não",
-    "mais",
-    "muito",
-    "ser",
-    "esta",
-    "está",
-    "foi",
 }
 
 
@@ -700,77 +653,16 @@ async def informacoes_loja(config: RunnableConfig = None) -> tuple[str, dict]:
 async def consultar_politicas(pergunta: str, config: RunnableConfig = None) -> tuple[str, dict]:
     """Busca no manual de políticas da loja as cláusulas que respondem a uma dúvida (troca, devolução, garantia, frete, pagamento, promoções, privacidade).
 
-    Devolve até 3 cláusulas com id, título e texto. Use o texto para explicar a regra em palavras simples.
+    Devolve até 5 cláusulas com id, título e texto. Use o texto para explicar a regra em palavras simples.
 
     Args:
         pergunta: A dúvida do cliente ou palavras-chave (ex.: "troca por defeito", "garantia", "frete outras cidades").
     """
     ctx = ctx_from_config(config)
     started = perf_counter()
-    words = [
-        w
-        for w in re.findall(r"\w+", catalog.normalize(pergunta))
-        if len(w) >= 3 and w not in STOPWORDS
-    ]
-    query = " OR ".join(dict.fromkeys(words)) if words else catalog.normalize(pergunta)
-    # Busca textual do Postgres em português, sem acentos, com peso maior no título.
-    sql = text(
-        """
-        WITH q AS (SELECT websearch_to_tsquery('portuguese', :q) AS tsq),
-        docs AS (
-            SELECT c.clause_id, c.title, c.body, c.order_index,
-                   setweight(to_tsvector('portuguese', unaccent(c.title)), 'A')
-                   || setweight(to_tsvector('portuguese', unaccent(c.body)), 'B') AS tsv
-            FROM policy_clauses c
-            WHERE c.clause_id <> '0'
-        )
-        SELECT d.clause_id, d.title, d.body, ts_rank(d.tsv, q.tsq) AS rank
-        FROM docs d, q
-        WHERE d.tsv @@ q.tsq
-        ORDER BY rank DESC, d.order_index
-        LIMIT 4
-        """
-    )
     async with ctx.session_factory() as session:
-        rows = (await session.execute(sql, {"q": query})).all()
-        # Uma seção-mãe (ex.: "8 Garantia") só aponta para as filhas: troca pelas filhas.
-        expanded: list = []
-        seen: set[str] = set()
-        for r in rows:
-            cid = r[0]
-            if "." not in cid:
-                children = (
-                    select(PolicyClause)
-                    .where(PolicyClause.section == int(cid), PolicyClause.clause_id != cid)
-                    .order_by(PolicyClause.order_index)
-                )
-                kids = list((await session.scalars(children)).all())
-                if kids:
-                    for k in kids:
-                        if k.clause_id not in seen:
-                            expanded.append((k.clause_id, k.title, k.body, r[3]))
-                            seen.add(k.clause_id)
-                    continue
-            if cid not in seen:
-                expanded.append(tuple(r))
-                seen.add(cid)
-        rows = expanded[:5]
-        if not rows and words:
-            like = (
-                select(PolicyClause)
-                .where(
-                    PolicyClause.clause_id != "0",
-                    func.unaccent(func.lower(PolicyClause.title + " " + PolicyClause.body)).like(
-                        f"%{words[0]}%"
-                    ),
-                )
-                .order_by(PolicyClause.order_index)
-                .limit(3)
-            )
-            rows = [
-                (c.clause_id, c.title, c.body, 0.0) for c in (await session.scalars(like)).all()
-            ]
-    if not rows:
+        hits = await search_clauses(session, pergunta)
+    if not hits:
         content = {
             "total": 0,
             "sumario": [{"id": cid, "titulo": title} for cid, title in ctx.policy_toc],
@@ -784,16 +676,16 @@ async def consultar_politicas(pergunta: str, config: RunnableConfig = None) -> t
             ok=False,
         )
     content = {
-        "total": len(rows),
-        "clausulas": [{"id": r[0], "titulo": r[1], "texto": r[2]} for r in rows],
+        "total": len(hits),
+        "clausulas": [{"id": h["id"], "titulo": h["titulo"], "texto": h["texto"]} for h in hits],
     }
     return _json(content), _evidence(
         "consultar_politicas",
-        summary=", ".join(r[0] for r in rows),
+        summary=", ".join(h["id"] for h in hits),
         started=started,
         tables=["policy_clauses"],
-        rows=[("policy_clauses", r[0]) for r in rows],
-        clauses=[r[0] for r in rows],
+        rows=[("policy_clauses", h["id"]) for h in hits],
+        clauses=[h["id"] for h in hits],
     )
 
 

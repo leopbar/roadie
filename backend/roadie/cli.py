@@ -171,7 +171,45 @@ def policies(
 @app.command("create-admin")
 def create_admin(if_missing: bool = typer.Option(False, "--if-missing")) -> None:
     """Cria o primeiro administrador a partir de ADMIN_EMAIL / ADMIN_PASSWORD."""
-    console.print("[yellow]create-admin ainda não implementado nesta versão[/yellow]")
+    asyncio.run(_create_admin(if_missing))
+
+
+async def _create_admin(if_missing: bool) -> None:
+    from sqlalchemy import select
+
+    from roadie.auth.security import AuthError, hash_password, validate_password_strength
+    from roadie.db.engine import session_scope
+    from roadie.db.models import User, UserRole
+
+    s = get_settings()
+    if not s.admin_email or not s.admin_password:
+        if if_missing:
+            console.print(
+                "[yellow]ADMIN_EMAIL/ADMIN_PASSWORD não definidos; nenhum admin criado[/yellow]"
+            )
+            return
+        console.print("[red]defina ADMIN_EMAIL e ADMIN_PASSWORD no .env[/red]")
+        raise typer.Exit(code=2)
+    email = s.admin_email.lower()
+    async with session_scope() as session:
+        existing = await session.scalar(select(User).where(User.email == email))
+        if existing:
+            console.print(f"[yellow]admin já existe:[/yellow] {existing.email}")
+            return
+        try:
+            validate_password_strength(s.admin_password)
+        except AuthError as exc:
+            console.print(f"[red]senha do admin fraca:[/red] {exc}")
+            raise typer.Exit(code=2) from exc
+        session.add(
+            User(
+                email=email,
+                name=s.admin_name,
+                password_hash=hash_password(s.admin_password),
+                role=UserRole.admin,
+            )
+        )
+    console.print(f"[green]admin criado:[/green] {email}")
 
 
 @app.command("info")

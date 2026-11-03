@@ -12,7 +12,7 @@ dependencies = [
   "sse-starlette>=2.1",
   "sqlalchemy[asyncio]>=2.0.30",
   "asyncpg>=0.29",
-  "pydantic>=2.7",
+  "pydantic[email]>=2.7",
   "pydantic-settings>=2.3",
   "langgraph>=1.0,<2",
   "langchain-core>=1.0,<2",
@@ -57,4 +57,4 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
-ignore = ["E501"]
+ignore = ["E501", "B008"]  # B008: Depends() em defaults é o padrão do FastAPI
