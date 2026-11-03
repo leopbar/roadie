@@ -191,5 +191,124 @@ def info() -> None:
     )
 
 
+# ----------------------------------------------------------------------------
+# conversar com o Tom
+# ----------------------------------------------------------------------------
+def _print_receipt(receipt: dict) -> None:
+    from rich.panel import Panel
+
+    tools = receipt.get("tools", [])
+    lines = []
+    for t in tools:
+        res = t.get("result") or {}
+        status = "ok" if res.get("ok", True) else "erro"
+        lines.append(
+            f"[cyan]{t['name']}[/cyan]({t.get('args')}) -> {res.get('summary')} [{status}, {res.get('duration_ms')} ms]"
+        )
+    src = receipt.get("sources", {})
+    model = receipt.get("model", {})
+    lines.append(
+        f"[dim]tabelas={src.get('tables')} cláusulas={src.get('clauses')} regras={src.get('rules')} "
+        f"flags={receipt.get('flags')} tickets={[t.get('protocolo') for t in receipt.get('tickets', [])]}[/dim]"
+    )
+    cost = receipt.get("cost_usd")
+    cost_label = f"US$ {cost:.5f}" if cost is not None else "?"
+    lines.append(
+        f"[dim]modelo={model.get('used')} fallback={model.get('fallback_used')} tokens={receipt.get('tokens', {}).get('total')} "
+        f"custo={cost_label} latência={receipt.get('latency_ms')} ms "
+        f"relógio={receipt.get('clock', {}).get('label')} identidade={receipt.get('identity', {}).get('name')}[/dim]"
+    )
+    console.print(Panel(chr(10).join(lines), title="bastidores", border_style="yellow"))
+
+
+def _parse_now(value: str | None):
+    from datetime import datetime
+
+    return datetime.fromisoformat(value) if value else None
+
+
+async def _ask(
+    text: str, phone: str | None, now: str | None, conversation: str | None, show_receipt: bool
+) -> None:
+    import uuid
+
+    from roadie.agent.service import TomService
+
+    service = TomService()
+    if conversation:
+        conv_id = uuid.UUID(conversation)
+    else:
+        conv = await service.start_conversation(phone, clock_override=_parse_now(now))
+        conv_id = conv.id
+    reply = await service.send(conv_id, text)
+    console.print(f"[bold green]Tom:[/bold green] {reply.content}")
+    console.print(f"[dim]conversa {conv_id}[/dim]")
+    if show_receipt:
+        _print_receipt(reply.receipt)
+
+
+@app.command("ask")
+def ask(
+    text: str = typer.Argument(..., help="mensagem do cliente"),
+    phone: str = typer.Option(
+        None, "--phone", "-p", help="telefone do remetente (como no WhatsApp)"
+    ),
+    now: str = typer.Option(
+        None, "--now", help="relógio simulado da conversa, ISO (ex.: 2026-03-24T10:00)"
+    ),
+    conversation: str = typer.Option(None, "--conversation", "-c", help="id de conversa existente"),
+    receipt: bool = typer.Option(
+        True, "--receipt/--no-receipt", help="mostra o recibo de evidências"
+    ),
+) -> None:
+    """Envia uma mensagem ao Tom e mostra a resposta com o recibo de evidências."""
+    asyncio.run(_ask(text, phone, now, conversation, receipt))
+
+
+async def _chat(phone: str | None, now: str | None, show_receipt: bool) -> None:
+    from roadie.agent.service import TomService
+
+    service = TomService()
+    conv = await service.start_conversation(phone, clock_override=_parse_now(now))
+    label = "identificado" if conv.identity_verified else "não identificado"
+    console.print(
+        f"[bold]Roadie[/bold] — conversa {conv.id} | remetente {phone or 'desconhecido'} ({label}) | modelo {service.models.mode}"
+    )
+    console.print("[dim]Digite a mensagem do cliente. Ctrl+C ou 'sair' para encerrar.[/dim]")
+    while True:
+        try:
+            text = console.input("[bold magenta]cliente>[/bold magenta] ")
+        except (EOFError, KeyboardInterrupt):
+            break
+        if text.strip().lower() in {"sair", "exit", "quit"}:
+            break
+        if not text.strip():
+            continue
+        try:
+            reply = await service.send(conv.id, text)
+        except Exception as exc:  # noqa: BLE001
+            console.print(f"[red]erro:[/red] {exc}")
+            continue
+        console.print(f"[bold green]Tom:[/bold green] {reply.content}")
+        if show_receipt:
+            _print_receipt(reply.receipt)
+
+
+@app.command("chat")
+def chat(
+    phone: str = typer.Option(
+        None, "--phone", "-p", help="telefone do remetente (como no WhatsApp)"
+    ),
+    now: str = typer.Option(
+        None, "--now", help="relógio simulado da conversa, ISO (ex.: 2026-03-24T10:00)"
+    ),
+    receipt: bool = typer.Option(
+        True, "--receipt/--no-receipt", help="mostra o recibo após cada resposta"
+    ),
+) -> None:
+    """Conversa interativa com o Tom no terminal."""
+    asyncio.run(_chat(phone, now, receipt))
+
+
 if __name__ == "__main__":
     app()

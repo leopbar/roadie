@@ -22,3 +22,11 @@ def dataset(data_dir: Path) -> Dataset:
 @pytest.fixture(scope="session")
 def clauses(data_dir: Path) -> list[ClauseDraft]:
     return load_policy_clauses(find_policy_pdf(data_dir))
+
+
+@pytest.fixture(scope="session", autouse=True)
+async def _dispose_engine_at_end():
+    from roadie.db.engine import dispose_engine
+
+    yield
+    await dispose_engine()
