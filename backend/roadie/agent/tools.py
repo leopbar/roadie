@@ -18,7 +18,7 @@ from time import perf_counter
 
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from roadie.agent import catalog
 from roadie.agent.context import RunContext, ctx_from_config
@@ -714,11 +714,47 @@ async def abrir_ticket(
     category = TICKET_CATEGORY_ALIASES.get(catalog.normalize(categoria), TicketCategory.outro)
     sla = rules.complaint_sla(ctx.now)
     async with ctx.session_factory() as session:
+        # Idempotência por conversa: o mesmo caso não vira dois tickets.
+        existing_stmt = select(Ticket).where(Ticket.conversation_id == ctx.conversation_id)
+        if pedido_id is not None:
+            existing_stmt = existing_stmt.where(Ticket.order_id == pedido_id)
+        else:
+            existing_stmt = existing_stmt.where(Ticket.category == category)
+        existing = await session.scalar(existing_stmt.order_by(Ticket.created_at.desc()))
+        if existing is not None:
+            due = existing.sla_due_at.astimezone(ctx.now.tzinfo) if existing.sla_due_at else None
+            info = {
+                "protocolo": existing.protocol,
+                "categoria": existing.category.value,
+                "prazo_retorno": (
+                    f"Retorno da equipe até {due.strftime('%d/%m às %H:%M')} (24 horas úteis)."
+                    if due
+                    else "24 horas úteis"
+                ),
+                "ja_existia": True,
+                "instrucao": "Já há um ticket aberto nesta conversa para este caso; repita o protocolo em vez de criar outro.",
+            }
+            return _json(info), _evidence(
+                "abrir_ticket",
+                summary=f"ticket {existing.protocol} já existia",
+                started=started,
+                tables=["tickets"],
+                rows=[("tickets", existing.protocol)],
+                clauses=["7.3"],
+                ticket=info,
+            )
+
         year = ctx.now.year
-        count = await session.scalar(
-            select(func.count(Ticket.id)).where(Ticket.protocol.like(f"RD-{year}-%"))
+        protocols = (
+            await session.scalars(
+                select(Ticket.protocol).where(Ticket.protocol.like(f"RD-{year}-%"))
+            )
+        ).all()
+        last = max(
+            (int(p.rsplit("-", 1)[1]) for p in protocols if p.rsplit("-", 1)[1].isdigit()),
+            default=0,
         )
-        protocol = f"RD-{year}-{(count or 0) + 1:04d}"
+        protocol = f"RD-{year}-{last + 1:04d}"
         customer_id = ctx.identity.customer_id if ctx.identity.verified else None
         if customer_id is None and ctx.sender_phone_digits:
             customer_id = await session.scalar(

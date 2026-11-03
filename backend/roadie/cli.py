@@ -349,5 +349,34 @@ def chat(
     asyncio.run(_chat(phone, now, receipt))
 
 
+# ----------------------------------------------------------------------------
+# conversas de exemplo
+# ----------------------------------------------------------------------------
+@app.command("evals")
+def evals(
+    out: str = typer.Option("../examples", "--out", help="pasta de saída das transcrições"),
+    only: list[str] = typer.Option(None, "--only", help="slug(s) de cenário; padrão: todos"),
+    quiet: bool = typer.Option(False, "--quiet"),
+) -> None:
+    """Roda os cenários roteirizados contra o agente e grava as conversas de exemplo em Markdown."""
+    from pathlib import Path
+
+    from roadie.agent.service import TomService
+    from roadie.evals.runner import run_all
+
+    async def _run() -> None:
+        service = TomService()
+        results = await run_all(service, Path(out).resolve(), only=only or None, verbose=not quiet)
+        total = sum(r.checks_total for r in results)
+        ok = sum(r.checks_ok for r in results)
+        failed = [r.scenario.slug for r in results if r.error]
+        console.print(f"[bold]{ok}/{total} verificações ok[/bold] em {len(results)} cenário(s)")
+        if failed:
+            console.print(f"[red]cenários com erro de execução:[/red] {failed}")
+            raise typer.Exit(code=1)
+
+    asyncio.run(_run())
+
+
 if __name__ == "__main__":
     app()
