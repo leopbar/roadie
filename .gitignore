@@ -1,0 +1,44 @@
+# ---- segredos e ambiente ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---- python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# ---- node / next.js ----
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+yarn-error.log*
+
+# ---- ferramentas locais e assistentes ----
+.claude/
+CLAUDE.md
+.cursor/
+.idea/
+.vscode/
+*.local.*
+
+# ---- sistema ----
+.DS_Store
+Thumbs.db
+*.log
+tmp/
+scratch/

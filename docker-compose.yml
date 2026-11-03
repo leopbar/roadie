@@ -1,0 +1,46 @@
+# Roadie — ambiente de desenvolvimento
+# Sobe banco, API e (em breve) o console web com um único comando:
+#   docker compose up --build
+
+name: roadie
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-roadie}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-roadie}
+      POSTGRES_DB: ${POSTGRES_DB:-roadie}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - roadie_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-roadie} -d ${POSTGRES_DB:-roadie}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-roadie}:${POSTGRES_PASSWORD:-roadie}@db:5432/${POSTGRES_DB:-roadie}
+      DATA_DIR: /app/data
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - ./backend/roadie:/app/backend/roadie
+      - ./data:/app/data:ro
+    command: ["uvicorn", "roadie.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  roadie_pgdata:
