@@ -1,0 +1,13 @@
+# Roadie — VPS que já tem nginx nas portas 80/443 (roadie.lbai.dev)
+#   docker compose -f docker-compose.prod.yml -f docker-compose.vps.yml up -d --build db api web
+#
+# O Caddy do compose de produção fica de fora: API e console são publicados só
+# em 127.0.0.1 e o nginx do host faz o HTTPS (infra/nginx/roadie.lbai.dev.conf).
+
+services:
+  api:
+    ports:
+      - "127.0.0.1:8012:8000"
+  web:
+    ports:
+      - "127.0.0.1:3012:3000"

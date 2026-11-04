@@ -12,6 +12,7 @@
   <img src="https://img.shields.io/badge/Tailwind-4-06B6D4?style=flat&logo=tailwindcss&logoColor=white" />
   <img src="https://img.shields.io/badge/Docker-Compose-2496ED?style=flat&logo=docker&logoColor=white" />
   <img src="https://img.shields.io/badge/Testes-pytest-0A9EDC?style=flat&logo=pytest&logoColor=white" />
+  <a href="https://github.com/leopbar/roadie/actions/workflows/deploy.yml"><img src="https://github.com/leopbar/roadie/actions/workflows/deploy.yml/badge.svg" alt="Testes e deploy" /></a>
   <img src="https://img.shields.io/badge/Licença-MIT-green?style=flat" />
 </p>
 
@@ -257,7 +258,32 @@ docker compose -f docker-compose.prod.yml up -d --build
 
 Defina `ROADIE_DOMAIN` no `.env`; o Caddy emite o certificado e serve o console em `/` e a API em `/api`. Variáveis de produção (`APP_ENV=prod`, `COOKIE_SECURE=true`) já vêm no compose.
 
-A instância em [roadie.lbai.dev](https://roadie.lbai.dev) roda num VPS que já tem nginx nas portas 80/443, servindo outros projetos. Lá o Caddy fica de fora: `db`, `api` e `web` sobem com as portas publicadas só em `127.0.0.1`, e o nginx do host faz o HTTPS (certbot) e o mesmo roteamento, `/api/` para a API com o prefixo removido e sem buffer para o SSE, o resto para o console.
+A instância em [roadie.lbai.dev](https://roadie.lbai.dev) roda num VPS que já tem nginx nas portas 80/443, servindo outros projetos. Lá o Caddy fica de fora: [`docker-compose.vps.yml`](docker-compose.vps.yml) publica `api` e `web` só em `127.0.0.1`, e o nginx do host ([`infra/nginx/roadie.lbai.dev.conf`](infra/nginx/roadie.lbai.dev.conf)) faz o HTTPS (certbot) e o mesmo roteamento: `/api/` para a API com o prefixo removido e sem buffer para o SSE, o resto para o console.
+
+```bash
+docker compose -f docker-compose.prod.yml -f docker-compose.vps.yml up -d --build db api web
+```
+
+### 🚀 Deploy automático
+
+**Todo push na `main` vai para produção sozinho**, desde que os testes passem. Não há passo manual. O workflow é [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) e o andamento aparece na aba **Actions** do repositório.
+
+```mermaid
+flowchart LR
+    PUSH[push na main] --> TEST[testes<br/>pytest + PostgreSQL 17]
+    TEST -- falhou --> STOP[nada é publicado]
+    TEST -- passou --> SSH[SSH no VPS<br/>chave de deploy]
+    SSH --> PULL[git reset para origin/main]
+    PULL --> BUILD[infra/deploy.sh<br/>rebuild e restart]
+    BUILD --> HEALTH[health check local<br/>e em roadie.lbai.dev]
+```
+
+1. **Testes.** Um PostgreSQL 17 sobe como serviço do job, o schema e os dados são carregados e os 67 testes rodam com o modelo simulado (sem chave, sem custo). Se algum falha, o deploy nem começa.
+2. **Deploy.** O job conecta por SSH com uma chave dedicada. No servidor essa chave está presa a um único comando (`command=` no `authorized_keys`, sem shell e sem port forwarding): `/usr/local/bin/roadie-deploy` trava contra deploys simultâneos, atualiza `/opt/roadie` para `origin/main` e chama [`infra/deploy.sh`](infra/deploy.sh).
+3. **Rebuild.** O `deploy.sh` reconstrói e reinicia `db`, `api` e `web` (o banco mantém o volume; o schema e a carga só rodam se faltarem) e espera a API e o console responderem. Se não responderem em 90 segundos, mostra os logs e o job falha.
+4. **Verificação.** O workflow ainda confere `https://roadie.lbai.dev/api/health` pela internet.
+
+Pushes em outros branches não publicam nada. Dá para repetir um deploy pela aba Actions (**Testes e deploy → Run workflow**). Os segredos do workflow (`VPS_HOST`, `VPS_SSH_KEY`, `VPS_KNOWN_HOSTS`) ficam em *Settings → Secrets and variables → Actions*; o `.env` de produção existe só no servidor e nunca passa pelo GitHub.
 
 ## 🧪 Testes
 
@@ -301,8 +327,12 @@ roadie/
 ├── data/                   # CSVs e PDF exatamente como entregues
 ├── docs/                   # enunciado, decisões de arquitetura, premissas
 ├── examples/               # conversas de exemplo geradas por `roadie evals`
-├── infra/Caddyfile         # produção: um domínio, HTTPS, /api → API
-├── docker-compose.yml · docker-compose.prod.yml · .env.example
+├── infra/
+│   ├── Caddyfile           # produção: um domínio, HTTPS, /api → API
+│   ├── nginx/              # site do VPS de roadie.lbai.dev (nginx do host)
+│   └── deploy.sh           # rebuild e health check, chamado pelo deploy automático
+├── .github/workflows/      # testes e deploy a cada push na main
+├── docker-compose.yml · docker-compose.prod.yml · docker-compose.vps.yml · .env.example
 ```
 
 ## ⚠️ Limitações conhecidas e o que faria com mais tempo

@@ -1,0 +1,82 @@
+# A cada push na main: testes do backend contra um PostgreSQL de verdade e,
+# se passarem, deploy em roadie.lbai.dev. Também dá para disparar à mão
+# (aba Actions → Testes e deploy → Run workflow).
+name: Testes e deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Um deploy por vez; um push novo espera o anterior terminar.
+concurrency:
+  group: deploy-producao
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: roadie
+          POSTGRES_PASSWORD: roadie
+          POSTGRES_DB: roadie
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U roadie -d roadie"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      APP_ENV: test
+      DATABASE_URL: postgresql+asyncpg://roadie:roadie@localhost:5432/roadie
+      LLM_MODE: mock
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Dependências
+        run: pip install "./backend[dev]"
+      - name: Schema e carga dos dados
+        working-directory: backend
+        run: |
+          python -m roadie.cli db init
+          python -m roadie.cli seed --if-empty
+      - name: Testes
+        working-directory: backend
+        run: python -m pytest -q
+
+  deploy:
+    needs: testes
+    runs-on: ubuntu-latest
+    environment:
+      name: producao
+      url: https://roadie.lbai.dev
+    steps:
+      - name: Chave SSH de deploy
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+      # A chave só executa o comando de deploy no servidor (command= no
+      # authorized_keys): atualiza /opt/roadie para origin/main e roda infra/deploy.sh.
+      - name: Deploy no VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o BatchMode=yes "root@$VPS_HOST"
+      - name: Verificação pública
+        run: |
+          for _ in $(seq 1 10); do
+            curl -fsS https://roadie.lbai.dev/api/health && exit 0
+            sleep 3
+          done
+          exit 1
