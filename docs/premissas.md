@@ -15,7 +15,7 @@ O enunciado pede que ambiguidades sejam resolvidas com uma interpretação razo�
 | Direito de arrependimento vale só para compras online | Todos os pedidos dos CSVs têm envio e rastreio, então são tratados como compras online. |
 | "Após o recebimento do produto" como início do prazo, mas o sistema não registra a data de recebimento | Para pedidos entregues, a data estimada de entrega é o melhor substituto, e o veredito diz isso. Se o cliente informar a data real, ela prevalece. Para pedidos enviados sem data, o Tom pergunta. |
 | Cancelamento antes do envio não está no manual | Pedidos pendentes ou confirmados viram pedido de cancelamento registrado para a equipe, seguindo a prática visível nos próprios dados (pedido 17: "cancelado pelo cliente antes do processamento"). |
-| Feriados não aparecem no manual nem nos dados | Dias úteis são segunda a sexta. Feriados ficam como limitação conhecida. |
+| O manual diz "Domingo e Feriados: fechado" e conta prazos em dias úteis, mas não lista os feriados | Vale o calendário oficial de Campo Grande/MS (`backend/roadie/policy/holidays.py`): feriados nacionais, a criação do estado (11/10) e o aniversário da cidade (26/08), com a Paixão de Cristo calculada pela Páscoa. Em feriado a loja está fechada e o dia não conta como útil (SLA de reclamação, prazos). Pontos facultativos (Carnaval, Corpus Christi, vésperas) não entram. |
 | "Sugerir lojas parceiras" para acessórios, sem lista de parceiras | O Tom diz que a equipe pode indicar, sem inventar nomes. |
 | "Mais de 300 instrumentos" no manual contra 65 nos CSVs | Os CSVs são a verdade operacional. O Tom nunca cita o tamanho do catálogo. |
 

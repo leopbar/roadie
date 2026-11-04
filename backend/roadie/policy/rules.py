@@ -15,6 +15,7 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
 from roadie.clock import WEEKDAYS_PT
+from roadie.policy.holidays import holiday_name
 from roadie.textfmt import brl, money, pct
 
 # ----------------------------------------------------------------------------
@@ -104,6 +105,8 @@ class HoursVerdict:
 
 
 def _window_for(day: date) -> tuple[time, time] | None:
+    if holiday_name(day):
+        return None
     wd = day.weekday()
     if wd <= 4:
         return WEEKDAY_OPEN, WEEKDAY_CLOSE
@@ -146,12 +149,16 @@ def store_hours(now: datetime) -> HoursVerdict:
     when = "hoje" if opens.date() == now.date() else WEEKDAYS_PT[opens.weekday()]
     if opens.date() == now.date() + timedelta(days=1):
         when = "amanhã"
+    holiday = holiday_name(now.date())
+    closed = (
+        f"A loja está fechada hoje, feriado ({holiday})." if holiday else "A loja está fechada agora."
+    )
     return HoursVerdict(
         is_open=False,
         now_label=label,
         opens_at=opens,
         closes_at=None,
-        message=f"A loja está fechada agora. Reabre {when} às {opens.strftime('%H:%M')}.",
+        message=f"{closed} Reabre {when} às {opens.strftime('%H:%M')}.",
     )
 
 
@@ -159,8 +166,8 @@ def store_hours(now: datetime) -> HoursVerdict:
 # Dias úteis e SLA de reclamação (cláusula 7.3)
 # ----------------------------------------------------------------------------
 def is_business_day(day: date) -> bool:
-    # Feriados não estão no manual nem nos dados; premissa: só fins de semana.
-    return day.weekday() <= 4
+    # Fins de semana e feriados de Campo Grande/MS (policy/holidays.py) não contam.
+    return day.weekday() <= 4 and holiday_name(day) is None
 
 
 def add_business_days(day: date, n: int) -> date:

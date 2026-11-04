@@ -135,6 +135,19 @@ async def test_identity_verification_by_order_and_email(service):
     assert after.receipt["identity"]["via"] == "pedido+email"
 
 
+async def test_identity_attempts_limit_spans_messages(service):
+    conv = await _conv(service, PHONE_UNKNOWN)
+    for i in range(3):
+        bad = await service.send(conv.id, f"meu pedido 8, e-mail errado{i}@jmail.com")
+        assert f'"tentativas_restantes": {2 - i}' in bad.content
+    # o limite vale para a conversa inteira: nem o e-mail certo passa mais
+    blocked = await service.send(conv.id, "pedido 8, e-mail anacarol.ferreira@coldmail.com")
+    assert "limite_de_tentativas" in blocked.content
+    assert blocked.receipt["identity"]["verified"] is False
+    stored = await service.get_conversation(conv.id)
+    assert stored.identity_attempts == 3 and not stored.identity_verified
+
+
 async def test_return_evaluation_applies_policy_dates(service):
     conv = await _conv(service, PHONE_CAMILA)  # pedido 16 pendente
     reply = await service.send(conv.id, "me arrependi do pedido 16, posso devolver?")

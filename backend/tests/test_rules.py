@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from roadie.policy import rules
+from roadie.policy.holidays import easter, holiday_name
 
 TZ = ZoneInfo("America/Campo_Grande")
 
@@ -42,6 +43,30 @@ def test_complaint_sla_business_day_is_next_business_day_same_time():
     assert rules.complaint_sla(at(2026, 3, 27, 17)).due_at == at(
         2026, 3, 30, 17
     )  # sexta -> segunda
+
+
+def test_easter_and_good_friday():
+    assert [easter(y) for y in (2025, 2026, 2027)] == [
+        date(2025, 4, 20),
+        date(2026, 4, 5),
+        date(2027, 3, 28),
+    ]
+    assert holiday_name(date(2026, 4, 3)) == "Paixão de Cristo"
+    assert holiday_name(date(2026, 6, 4)) is None  # Corpus Christi: ponto facultativo
+
+
+def test_store_closed_on_holiday():
+    v = rules.store_hours(at(2026, 4, 21, 10))  # terça, Tiradentes
+    assert not v.is_open and v.opens_at == at(2026, 4, 22, 9)
+    assert "Tiradentes" in v.message
+
+
+def test_complaint_sla_skips_holidays():
+    # quinta antes da Paixão de Cristo: sexta é feriado, retorno na segunda
+    assert rules.complaint_sla(at(2026, 4, 2, 10)).due_at == at(2026, 4, 6, 10)
+    # aberta no aniversário de Campo Grande (quarta, 26/08): conta a partir de quinta 9h
+    assert rules.complaint_sla(at(2026, 8, 26, 10)).due_at == at(2026, 8, 28, 9)
+    assert rules.complaint_sla(at(2026, 8, 25, 15)).due_at == at(2026, 8, 27, 15)
 
 
 def test_complaint_sla_weekend_starts_counting_on_monday():

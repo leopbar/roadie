@@ -20,7 +20,7 @@ Registro curto das escolhas que moldam o projeto, com o que foi considerado e po
 
 ## 3. Identidade por construção, não por prompt
 
-**Decisão.** As ferramentas de pedido só enxergam os pedidos do cliente identificado na conversa. A identificação vem do telefone do remetente (como no WhatsApp) ou de número do pedido mais e-mail ou telefone, com três tentativas. O escopo é imposto no código das ferramentas (`backend/roadie/agent/tools.py`), não em instrução ao modelo.
+**Decisão.** As ferramentas de pedido só enxergam os pedidos do cliente identificado na conversa. A identificação vem do telefone do remetente (como no WhatsApp) ou de número do pedido mais e-mail ou telefone, com três tentativas por conversa (o contador fica na própria conversa, no banco, e não zera a cada mensagem). O escopo é imposto no código das ferramentas (`backend/roadie/agent/tools.py`), não em instrução ao modelo.
 
 **Por quê.** Os CSVs têm quase homônimos e um e-mail repetido; identificar por nome seria um vazamento esperando acontecer. Com o escopo no código, uma injeção de prompt que convença o modelo a "mostrar o pedido do Pedro" não tem efeito: a ferramenta devolve "não encontrado para este cliente".
 

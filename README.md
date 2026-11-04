@@ -156,7 +156,7 @@ flowchart LR
 | `buscar_produtos` | Catálogo por termo, categoria, faixa de preço, cordas, eletrônica; tolera frases inteiras e erros de digitação | `products`, `promotions` |
 | `detalhar_produto` | Preço de tabela, PIX, promoção, parcelamento máximo, alternativas quando indisponível ou em quarentena | `products`, regras de preço e parcelas |
 | `promocoes_ativas` | Só promoções com `is_active`; nunca promete promoção expirada | `promotions` |
-| `verificar_identidade` | Pedido + e-mail ou telefone; três tentativas; nada do cadastro é revelado | `orders`, `customers` |
+| `verificar_identidade` | Pedido + e-mail ou telefone; três tentativas por conversa, contadas no banco; nada do cadastro é revelado | `orders`, `customers` |
 | `meus_pedidos` / `consultar_pedido` | Pedidos do cliente identificado, com situação de entrega e atraso | `orders`, `order_items` |
 | `avaliar_devolucao` | Arrependimento, defeito ou preferência com os prazos do manual e a data de recebimento | regra `return_eligibility` |
 | `calcular_parcelas` / `calcular_frete` / `horario_loja` | Regras determinísticas com cláusula citada | `rules.py` |
@@ -172,7 +172,7 @@ Resumo das escolhas que o enunciado pede para justificar. O detalhe, com alterna
 |---|---|---|
 | Abordagem do agente | **Híbrida**: function calling orquestrado por LangGraph, com ferramentas tipadas sobre SQL parametrizado, regras determinísticas e busca textual no manual | O modelo decide *o que* consultar; o código decide *o que é verdade*. Sem SQL gerado por modelo, sem contas feitas por modelo |
 | Framework | LangGraph 1.x com um grafo pequeno e explícito | Limite de rodadas, prompt de sistema montado por rodada e estado observável, sem a opacidade de agentes pré-prontos |
-| Modelo e provedor | OpenAI, `gpt-6.1-terra` como principal e `gpt-6-luna` como fallback automático; modelo simulado para testes | Boa relação qualidade e custo em function calling; fallback transparente em falha ou cota; os 67 testes rodam sem rede e sem custo |
+| Modelo e provedor | OpenAI, `gpt-6.1-terra` como principal e `gpt-6-luna` como fallback automático; modelo simulado para testes | Boa relação qualidade e custo em function calling; fallback transparente em falha ou cota; os 71 testes rodam sem rede e sem custo |
 | Retrieval | Full-text search do PostgreSQL em português, sem acentos, sobre 29 cláusulas numeradas extraídas do PDF, com casamento por prefixo para verbo e substantivo ("devolver" acha "devolução") | Para um manual de 8 páginas, busca lexical com stemming acerta, custa zero e cabe no mesmo banco. `pgvector` entra sem trocar de arquitetura se o acervo crescer |
 | Estratégia de prompt | Persona com regras numeradas do manual, contexto por rodada (relógio, identidade, sumário do manual) e ferramentas que devolvem `instrucao` quando algo falta | O prompt diz como se comportar; as ferramentas dizem o que é verdade; a resposta nunca cita número de cláusula ao cliente, o recibo registra |
 | Persistência | PostgreSQL para tudo: dados da loja, conversas, mensagens com recibo, tickets, usuários, configurações cifradas | Um único sistema para operar e auditar; histórico de conversa reconstruído a cada mensagem |
@@ -278,7 +278,7 @@ flowchart LR
     BUILD --> HEALTH[health check local<br/>e em roadie.lbai.dev]
 ```
 
-1. **Testes.** Um PostgreSQL 17 sobe como serviço do job, o schema e os dados são carregados e os 67 testes rodam com o modelo simulado (sem chave, sem custo). Se algum falha, o deploy nem começa.
+1. **Testes.** Um PostgreSQL 17 sobe como serviço do job, o schema e os dados são carregados e os 71 testes rodam com o modelo simulado (sem chave, sem custo). Se algum falha, o deploy nem começa.
 2. **Deploy.** O job conecta por SSH com uma chave dedicada. No servidor essa chave está presa a um único comando (`command=` no `authorized_keys`, sem shell e sem port forwarding): `/usr/local/bin/roadie-deploy` trava contra deploys simultâneos, atualiza `/opt/roadie` para `origin/main` e chama [`infra/deploy.sh`](infra/deploy.sh).
 3. **Rebuild.** O `deploy.sh` reconstrói e reinicia `db`, `api` e `web` (o banco mantém o volume; o schema e a carga só rodam se faltarem) e espera a API e o console responderem. Se não responderem em 90 segundos, mostra os logs e o job falha.
 4. **Verificação.** O workflow ainda confere `https://roadie.lbai.dev/api/health` pela internet.
@@ -291,14 +291,14 @@ Pushes em outros branches não publicam nada. Dá para repetir um deploy pela ab
 cd backend && pytest
 ```
 
-67 testes em sete grupos, todos sem chave de API e sem custo:
+71 testes em sete grupos, todos sem chave de API e sem custo:
 
 | Grupo | O que cobre |
 |---|---|
 | `test_csv_loader` | Leitura e normalização dos seis CSVs |
 | `test_policy_pdf` | Extração do manual pela numeração, listas e cabeçalhos |
 | `test_quality` | Quarentena: cada armadilha dos dados é detectada e nenhum produto consistente é bloqueado |
-| `test_rules` | Motor de regras: horário, SLA, PIX, promoções, parcelas, frete, rastreio, devoluções, garantia, e a **deriva** entre código e manual |
+| `test_rules` | Motor de regras: horário, feriados, SLA, PIX, promoções, parcelas, frete, rastreio, devoluções, garantia, e a **deriva** entre código e manual |
 | `test_agent` | Agente completo com o modelo simulado: identidade, escopo, quarentena, políticas, tickets, streaming, persistência |
 | `test_api` | Autenticação, cookies, refresh, rotas, SSE, visões, administração |
 | `test_llm_settings` | Cifra, precedência banco sobre ambiente, teste de conexão, recarga do agente |
@@ -338,10 +338,8 @@ roadie/
 ## ⚠️ Limitações conhecidas e o que faria com mais tempo
 
 - **Histórico de conversa sem as chamadas de ferramenta.** Cada mensagem recebe só o texto das anteriores; os fatos ficam nas respostas, não nos resultados brutos. Com mais tempo, guardaria o estado do grafo com um checkpointer do LangGraph no próprio Postgres.
-- **Feriados não existem.** Dias úteis são segunda a sexta. Um calendário de feriados de MS resolveria o SLA e os prazos de entrega.
 - **Data de recebimento é estimada.** Os dados não registram quando o cliente recebeu; a data estimada de entrega é o substituto, documentado no veredito. Integrar o rastreio real dos Correios fecharia a lacuna.
 - **Frete fora da região metropolitana não é cotado.** O manual diz que depende de CEP, peso e dimensões, que os dados não têm. O Tom explica as modalidades e abre ticket.
-- **Tentativas de identidade não persistem entre mensagens.** O limite de três vale por rodada; persistir o contador na conversa é uma linha de modelo a mais.
 - **Sem canal de WhatsApp real.** O console simula o remetente. Ligar a API oficial do WhatsApp é um adaptador sobre o mesmo serviço de conversa.
 - **Avaliação com um conjunto pequeno.** Cinco cenários roteirizados. O próximo passo seria um conjunto maior com variações de fraseado, rodado em CI com o modelo real e um orçamento de custo por execução.
 - **Observabilidade.** O recibo cobre a resposta; faltam traços distribuídos (Langfuse ou OpenTelemetry) para olhar a frota de conversas ao longo do tempo.

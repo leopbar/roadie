@@ -270,6 +270,10 @@ class Conversation(Base):
     customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.customer_id"))
     identity_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     verified_via: Mapped[str | None] = mapped_column(String(32))  # phone | order_email
+    # tentativas de verificação que falharam, somadas em toda a conversa (limite: 3)
+    identity_attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
     clock_override: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     title: Mapped[str | None] = mapped_column(String(200))
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(

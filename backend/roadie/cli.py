@@ -63,6 +63,14 @@ async def _init_schema() -> None:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS unaccent"))
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
         await conn.run_sync(Base.metadata.create_all)
+        # Colunas criadas depois do primeiro deploy: create_all não altera tabelas
+        # existentes, então o ajuste é feito aqui, de forma idempotente.
+        await conn.execute(
+            text(
+                "ALTER TABLE conversations "
+                "ADD COLUMN IF NOT EXISTS identity_attempts integer NOT NULL DEFAULT 0"
+            )
+        )
 
 
 @db_app.command("init")

@@ -226,6 +226,7 @@ class TomService:
                 city=conv.customer.city if conv.customer else None,
                 verified=conv.identity_verified,
                 via=conv.verified_via,
+                attempts=conv.identity_attempts,
             )
             now = self.clock.now(conv.clock_override)
             sender_phone, sender_digits = conv.sender_phone, conv.sender_phone_digits
@@ -304,6 +305,7 @@ class TomService:
                 receipt=receipt,
             )
             session.add(reply)
+            conv.identity_attempts = ctx.identity.attempts
             if ctx.identity_changed and ctx.identity.verified:
                 conv.customer_id = ctx.identity.customer_id
                 conv.identity_verified = True
