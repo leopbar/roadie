@@ -17,22 +17,49 @@
 
 Projeto desenvolvido para o desafio técnico de AI Engineer da [Artefact](https://www.artefact.com/). O enunciado está em [`docs/desafio/`](docs/desafio/).
 
+### 🌐 No ar
+
+**[roadie.lbai.dev](https://roadie.lbai.dev)**
+
+> O acesso ao console é restrito. Para uma conta de demonstração, fale comigo pelo [LinkedIn](https://www.linkedin.com/in/leonardo-barretti/) ou por e-mail.
+
 ---
 
 ## 🎬 Em ação
 
-<p align="center">
-  <img src="docs/screenshots/simulador.png" alt="Simulador de atendimento com o painel de bastidores" width="900" />
-</p>
+Gravações do console com o modelo real, sem cortes nas respostas do Tom.
 
-> A Camila, identificada pelo telefone, pergunta se pode devolver a compra. O Tom consulta os pedidos dela, aplica a política de trocas e descobre que o pedido 16 ainda nem foi enviado: o caminho é cancelamento, não devolução. À direita, o recibo de evidências: identidade verificada, três consultas, cláusulas citadas, regra aplicada, tokens e custo.
+### 1. Devolução que vira cancelamento
 
 <p align="center">
-  <img src="docs/screenshots/qualidade.png" alt="Tela de qualidade de dados com as sinalizações da ingestão" width="440" />
-  <img src="docs/screenshots/politicas.png" alt="Tela de políticas com as cláusulas extraídas do manual" width="440" />
+  <img src="docs/demo/01-devolucao.gif" alt="Login, pergunta sobre devolução e o painel de bastidores com o recibo de evidências" width="900" />
 </p>
 
-> À esquerda, o que a ingestão encontrou de errado nos CSVs, em três severidades. À direita, o manual extraído do PDF em cláusulas numeradas, com a mesma busca que o Tom usa.
+> Login no console e, no simulador, a Camila (identificada pelo telefone) pergunta se pode devolver a compra. Os *Bastidores* mostram as ferramentas em tempo real: o Tom consulta os pedidos dela, busca as cláusulas de troca e roda a regra de devolução, que descobre que o pedido 16 ainda nem foi enviado. O caminho é cancelamento, não devolução. Ela confirma e o Tom abre o ticket. O recibo fecha com identidade, fontes, cláusulas, regras determinísticas, tokens e custo.
+
+### 2. Número desconhecido: verificação antes de falar do pedido
+
+<p align="center">
+  <img src="docs/demo/02-verificacao-identidade.gif" alt="Remetente não cadastrado pede status do pedido e é verificado pelo e-mail" width="900" />
+</p>
+
+> O remetente vem de um número não cadastrado e pergunta pelo pedido 8. O Tom não revela nada antes de confirmar a identidade pelo e-mail; depois informa o atraso e o rastreio e, a pedido da cliente, registra uma reclamação com protocolo e prazo de retorno calculado pelo relógio da loja.
+
+### 3. Catálogo, produto ausente e assunto fora do escopo
+
+<p align="center">
+  <img src="docs/demo/03-catalogo-e-escopo.gif" alt="Preço com parcelamento, categoria sem produto e recusa de assunto alheio" width="900" />
+</p>
+
+> Preço de tabela, PIX e parcelamento do Takamine GD20 vindos das regras de preço; saxofone que não existe no catálogo vira registro de interesse, não invenção; previsão do tempo é recusada com educação, sem chamar ferramenta.
+
+### 4. Operação: conversas, tickets, qualidade de dados, políticas, catálogo e configurações
+
+<p align="center">
+  <img src="docs/demo/04-operacao.gif" alt="Navegação pelas telas de operação do console" width="900" />
+</p>
+
+> O histórico de conversas com o recibo de cada resposta, a fila de tickets que o Tom abriu, o que a ingestão encontrou de errado nos CSVs (em três severidades), o manual extraído do PDF em cláusulas com a mesma busca que o Tom usa, o catálogo com as sinalizações de quarentena e a configuração do modelo.
 
 ---
 
@@ -229,6 +256,8 @@ docker compose -f docker-compose.prod.yml up -d --build
 ```
 
 Defina `ROADIE_DOMAIN` no `.env`; o Caddy emite o certificado e serve o console em `/` e a API em `/api`. Variáveis de produção (`APP_ENV=prod`, `COOKIE_SECURE=true`) já vêm no compose.
+
+A instância em [roadie.lbai.dev](https://roadie.lbai.dev) roda num VPS que já tem nginx nas portas 80/443, servindo outros projetos. Lá o Caddy fica de fora: `db`, `api` e `web` sobem com as portas publicadas só em `127.0.0.1`, e o nginx do host faz o HTTPS (certbot) e o mesmo roteamento, `/api/` para a API com o prefixo removido e sem buffer para o SSE, o resto para o console.
 
 ## 🧪 Testes
 
