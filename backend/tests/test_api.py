@@ -222,6 +222,12 @@ async def test_operations_views(agent):
     s = await agent.get("/policies/search", params={"q": "garantia"})
     assert s.status_code == 200 and "8.1" in [c["id"] for c in s.json()]
 
+    # verbo e substantivo têm radicais diferentes ("devolver" x "devolução")
+    s = await agent.get("/policies/search", params={"q": "posso devolver?"})
+    assert s.status_code == 200 and "4.1" in [c["id"] for c in s.json()]
+    s = await agent.get("/policies/search", params={"q": "como posso pagar?"})
+    assert s.status_code == 200 and "3.1" in [c["id"] for c in s.json()]
+
     prods = await agent.get("/products", params={"q": "ukulele tenor"})
     assert prods.status_code == 200 and all("Tenor" in x["name"] for x in prods.json())
 

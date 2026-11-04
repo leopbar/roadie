@@ -74,9 +74,17 @@ STOPWORDS = {
     "oi",
 }
 
+# O stemmer do português dá radicais diferentes para verbo e substantivo
+# ("devolver" -> devolv, "devolução" -> devoluca, "pagar" -> pag, "pagamento"
+# -> pagament). Além da busca exata, cada palavra com 5+ letras entra como
+# prefixo (ver prefix_query); palavras curtas ficam só na busca exata.
 _SQL = text(
     """
-    WITH q AS (SELECT websearch_to_tsquery('portuguese', :q) AS tsq),
+    WITH q AS (
+        SELECT CASE WHEN :prefix = '' THEN websearch_to_tsquery('portuguese', :q)
+                    ELSE websearch_to_tsquery('portuguese', :q) || to_tsquery('simple', :prefix)
+               END AS tsq
+    ),
     docs AS (
         SELECT c.clause_id, c.title, c.body, c.order_index,
                setweight(to_tsvector('portuguese', unaccent(c.title)), 'A')
@@ -105,13 +113,21 @@ def keywords(question: str) -> list[str]:
     return list(dict.fromkeys(words))
 
 
+def prefix_query(words: list[str]) -> str:
+    """Prefixos para tsquery: até 5 letras, sempre deixando o fim da palavra de fora
+    ("pagar" -> paga:*, "devolver" -> devol:*). Palavras com menos de 5 letras não entram."""
+    stems = [w[: min(5, len(w) - 1)] for w in words if len(w) >= 5 and w.isalpha()]
+    return " | ".join(f"{s}:*" for s in dict.fromkeys(stems))
+
+
 async def search_clauses(session: AsyncSession, question: str, limit: int = 4) -> list[dict]:
     """Cláusulas mais relevantes para a pergunta, com seções-mãe expandidas nas filhas."""
     words = keywords(question)
     query = " OR ".join(words) if words else normalize(question)
     if not query:
         return []
-    rows = (await session.execute(_SQL, {"q": query, "limit": limit})).all()
+    params = {"q": query, "prefix": prefix_query(words), "limit": limit}
+    rows = (await session.execute(_SQL, params)).all()
 
     expanded: list[dict] = []
     seen: set[str] = set()

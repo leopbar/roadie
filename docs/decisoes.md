@@ -40,7 +40,9 @@ Registro curto das escolhas que moldam o projeto, com o que foi considerado e po
 
 **Decisão.** As cláusulas do manual são indexadas com o full-text search do PostgreSQL em português, sem acentos, com peso maior no título, e seções-mãe são expandidas nas filhas. Não há embeddings nem vetores.
 
-**Por quê.** O manual tem 29 cláusulas curtas e bem intituladas. Busca lexical com stemming em português acerta o alvo, custa zero por consulta, roda offline e cabe no mesmo banco. Embeddings seriam mais infraestrutura para o mesmo resultado. Se o acervo crescer para dezenas de documentos, `pgvector` entra no mesmo Postgres sem trocar de arquitetura.
+**Por quê.** O manual tem 29 cláusulas curtas e bem intituladas. Busca lexical com stemming em português acerta o alvo, custa zero por consulta, roda offline e cabe no mesmo banco. Embeddings seriam mais infraestrutura para o mesmo resultado.
+
+**Ajuste.** O stemmer do português dá radicais diferentes para verbo e substantivo ("devolver" vira `devolv`, "devolução" vira `devoluca`; "pagar" vira `pag`, "pagamento" vira `pagament`), e a pergunta do cliente "posso devolver?" não achava nada. Além da busca exata, cada palavra da pergunta com cinco letras ou mais entra também como prefixo de até cinco letras, sem a última (`devol:*`, `paga:*`). Palavras curtas como "ver" e "dar" ficam só na busca exata, porque como prefixo puxariam "verificar" e afins. A busca exata segue pesando mais no ranking. Se o acervo crescer para dezenas de documentos, `pgvector` entra no mesmo Postgres sem trocar de arquitetura.
 
 ## 7. LangGraph com um laço explícito de ferramentas
 

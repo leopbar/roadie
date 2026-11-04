@@ -160,7 +160,7 @@ flowchart LR
 | `avaliar_devolucao` | Arrependimento, defeito ou preferência com os prazos do manual e a data de recebimento | regra `return_eligibility` |
 | `calcular_parcelas` / `calcular_frete` / `horario_loja` | Regras determinísticas com cláusula citada | `rules.py` |
 | `informacoes_loja` | Endereço, contatos, história, escopo | cláusulas 0, 1, 1.2, 7 |
-| `consultar_politicas` | Busca textual nas cláusulas, com peso no título e seções expandidas | `policy_clauses` |
+| `consultar_politicas` | Busca textual nas cláusulas, com peso no título, prefixos para variações de palavra e seções expandidas | `policy_clauses` |
 | `abrir_ticket` | Protocolo `RD-AAAA-NNNN` e prazo de 24 horas úteis | `tickets`, regra `complaint_sla` |
 
 ## 🛠️ Decisões técnicas
@@ -172,7 +172,7 @@ Resumo das escolhas que o enunciado pede para justificar. O detalhe, com alterna
 | Abordagem do agente | **Híbrida**: function calling orquestrado por LangGraph, com ferramentas tipadas sobre SQL parametrizado, regras determinísticas e busca textual no manual | O modelo decide *o que* consultar; o código decide *o que é verdade*. Sem SQL gerado por modelo, sem contas feitas por modelo |
 | Framework | LangGraph 1.x com um grafo pequeno e explícito | Limite de rodadas, prompt de sistema montado por rodada e estado observável, sem a opacidade de agentes pré-prontos |
 | Modelo e provedor | OpenAI, `gpt-6.1-terra` como principal e `gpt-6-luna` como fallback automático; modelo simulado para testes | Boa relação qualidade e custo em function calling; fallback transparente em falha ou cota; os 67 testes rodam sem rede e sem custo |
-| Retrieval | Full-text search do PostgreSQL em português, sem acentos, sobre 29 cláusulas numeradas extraídas do PDF | Para um manual de 8 páginas, busca lexical com stemming acerta, custa zero e cabe no mesmo banco. `pgvector` entra sem trocar de arquitetura se o acervo crescer |
+| Retrieval | Full-text search do PostgreSQL em português, sem acentos, sobre 29 cláusulas numeradas extraídas do PDF, com casamento por prefixo para verbo e substantivo ("devolver" acha "devolução") | Para um manual de 8 páginas, busca lexical com stemming acerta, custa zero e cabe no mesmo banco. `pgvector` entra sem trocar de arquitetura se o acervo crescer |
 | Estratégia de prompt | Persona com regras numeradas do manual, contexto por rodada (relógio, identidade, sumário do manual) e ferramentas que devolvem `instrucao` quando algo falta | O prompt diz como se comportar; as ferramentas dizem o que é verdade; a resposta nunca cita número de cláusula ao cliente, o recibo registra |
 | Persistência | PostgreSQL para tudo: dados da loja, conversas, mensagens com recibo, tickets, usuários, configurações cifradas | Um único sistema para operar e auditar; histórico de conversa reconstruído a cada mensagem |
 | Tratamento dos dados | Ingestão com validação por linha, extração do PDF pela numeração do próprio manual e quarentena com três severidades | Marcar em vez de corrigir preserva a verdade dos dados e dá à loja a lista do que consertar |
